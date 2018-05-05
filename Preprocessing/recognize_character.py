@@ -25,8 +25,11 @@ def recognize_character(char):
         res = cv2.matchTemplate(char,template,cv2.TM_CCORR_NORMED)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
         correlations.append(max_val)
-          
-    # get the character with the highest correlation
-    best_match = correlations.index(max(correlations))
-    name = templates[best_match].split('.')[0]
-    return correlations, name
+
+
+    # get the 3 characters with the highest correlation
+    best1 = correlations.index(max(correlations))
+    correlations[best1] = 0
+    best2 = correlations.index(max(correlations))
+    
+    return [best1, best2]
