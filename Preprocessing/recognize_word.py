@@ -5,6 +5,38 @@ import numpy as np
 import pandas as pd
 from recognize_character import *
 
+# compute the frequency of the word by summing the frequency of all of its ngrams
+def compute_frequency(word_string, n_chars, names, frequencies):
+    # a word with N characters has N-1 bigrams
+    print("_".join(word_string))
+    N_grams = n_chars - 1
+    current_bigram = 2
+    total_sum = 0
+    while(current_bigram <= n_chars):
+        start = 0
+        end = current_bigram
+        # get the frequency of all of the current grams
+        for i in range(N_grams):
+            gram = "_".join(word_string[start:end])
+            try:
+                 # find the index of the recognized word in the ngrams file
+                index = names.index(gram)
+                # find the frequency of the word
+                freq = freqs[index]
+                print("N gram:", N_grams, "index:", i)
+                total_sum += freq
+            except:
+                pass
+            start += 1
+            end += 1
+          
+        current_bigram += 1
+        N_grams -= 1
+        
+    return total_sum
+    
+
+
 # find the most likely word from the given word image
 def recognize_word(word):
     templates = os.listdir('templates')
@@ -44,7 +76,9 @@ def recognize_word(word):
     
     for combination in combinations:
         word_string = ""
+        n_chars = 0
         for char_index in combination:
+            n_chars += 1
             # get the character name
             ch = templates[char_index].split('.')[0]
             # add the character to the total word string
@@ -53,19 +87,10 @@ def recognize_word(word):
         word_string = word_string.split()
         word_string.reverse()
         word_string = "_".join(word_string)
-        #print(word_string)
-        try:
-            # find the index of the recognized word in the ngrams file
-            index = names.index(word_string)
-            # find the frequency of the word
-            freq = freqs[index]
-            #print(freq)
-            #print(word_string)
-            combi_freqs.append([freq,word_string])
-        except:
-            # if word is not found in ngram file, set frequency to zero
-            combi_freqs.append([0,word_string])
-            #print("Word does not exist in ngrams file")
+        # compute the total frequency of the word
+        freq = compute_frequency(word_string.split('_'), n_chars, names, freqs)
+        combi_freqs.append([freq,word_string])
+        print('Total:', freq)
 
     # return the most frequent combination
     mx = 0

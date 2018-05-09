@@ -12,7 +12,8 @@ def recognize_character(char):
     char = char.astype(np.uint8)
     correlations = []
     templates = os.listdir('templates')
-    
+    kernel = np.ones((5, 5), np.uint8)
+
     for i in range(len(templates)):
         # load template
         path = 'templates/' + templates[i]
@@ -31,5 +32,8 @@ def recognize_character(char):
     best1 = correlations.index(max(correlations))
     correlations[best1] = 0
     best2 = correlations.index(max(correlations))
+    correlations[best2] = 0
+    best3 = correlations.index(max(correlations))
+    print(best1, best2, best3)
     
-    return [best1, best2]
+    return [best1, best2, best3]
