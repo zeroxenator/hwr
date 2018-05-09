@@ -34,6 +34,6 @@ def recognize_character(char):
     best2 = correlations.index(max(correlations))
     correlations[best2] = 0
     best3 = correlations.index(max(correlations))
-    print(best1, best2, best3)
+   #print(best1, best2, best3)
     
     return [best1, best2, best3]
