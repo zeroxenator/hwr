@@ -3,6 +3,8 @@ import cv2
 import itertools
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
 from recognize_character import *
 
 # for each ngram, check if they occur as ngrams for words in the ngram file
@@ -15,7 +17,7 @@ def find_Ngram(gram, current_n, names, frequencies):
         if(gram in word):
             index = names.index(word)
             count += proportion * frequencies[index]
-    print(gram, 'weighted frequency:',  count)
+    #print(gram, 'weighted frequency:',  count)
     return count
             
         
@@ -73,12 +75,20 @@ def compute_penalty(combination, char_proposals):
     
 
 # find the most likely word from the given word image
-def recognize_word(word):
+def recognize_word(word, avg_width):
+    kernel = np.ones((3,3),np.uint8)
+    
+    plt.figure(figsize = (500,4))
+    plt.imshow(word, cmap='gray', aspect = 1)
+    plt.show()
+    
     templates = os.listdir('templates')
     ngrams = pd.read_excel('ngrams_frequencies_withNames.xlsx')
     #print(ngrams.head())
-    _, word = cv2.threshold(word,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    #_, word = cv2.threshold(word,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     word = 255 - word
+    word = cv2.dilate(word, kernel, iterations = 1)
+    
     # find the characters by using connected components 
     _, labels, stats, centroids = cv2.connectedComponentsWithStats(word, 8, cv2.CV_32S)
     # remove the background component
@@ -87,22 +97,66 @@ def recognize_word(word):
     stats = stats[stats[:,0].argsort()]
     chars = []
     # filter out components that are too small
+    print(stats)
+    print("Average width:", avg_width)
     for i in range(len(stats)):
-        if(stats[i][4] > 300):
-            chars.append(stats[i])
+        cutoff_points = []
+        if(stats[i][2] > (0.4 * avg_width) and stats[i][2] < (avg_width * 5)): 
+            width = stats[i][2]
+            height = stats[i][3]
+            # If component is too wide, it probably consists of multiple characters
+            # apply water drop algorithm to try to separate all the characters within 
+            if(width > (1.3 * avg_width)):
+                #sub_word = word[stats[i][1]:stats[i][1] + height, stats[i][0]:stats[i][0] + width]
+                sub_word = word[:, stats[i][0]:stats[i][0] + width]
+                histogram = np.zeros(width)
+                # count black pixels for every column of the characer(s)
+                for i in range(width):
+                    histogram[i] = height - np.count_nonzero(sub_word[:, i])
+                mx = max(histogram)
+                mn = min(histogram)
+                avg = np.mean(histogram)
+                std = np.std(histogram)
+                
+                
+                # if a column has too few black pixels, separate the two components
+                for i in range(len(histogram)):
+                    if(histogram[i] <= (avg - (1.5 * std)) and histogram[i] > (0.2*height) and len(cutoff_points) < 3): 
+                        
+                        cutoff_points.append(i)
+                # if separation is needed, separate the component using all the found
+                # cutoff points
+                x1 = 0
+                x2 = 0
+                for point in cutoff_points:
+                    x2 = point
+                    # character has to be big enough
+                    if((x2 - x1) > (0.3 * avg_width)):
+                        chars.append(sub_word[:, x1:x2])
+                        x1 = point  
+                    chars.append(sub_word[:, x1:])
+                    
+                # if no cutoff points found, append the 'character' anyway
+                if(len(cutoff_points) == 0):
+                    chars.append(sub_word)
+                    
+                                                             
+                                             
+            else:
+                #chars.append(word[stats[i][1]:stats[i][1] + height, stats[i][0]:stats[i][0] + width])
+                chars.append(word[:, stats[i][0]:stats[i][0] + width])
     word_string = ""
     # match the characters in the word
     char_proposals = [] 
-    for i in range(len(chars)):
-        char = word[stats[i][1]:stats[i][1]+stats[i][3],
-                    stats[i][0]:stats[i][0]+stats[i][2]]
+    for char in chars:
+        #char = word[stat[1]:stat[1] + stat[3], stat[0]:stat[0]+stat[2]]
         predictions = recognize_character(char)
         char_proposals.append(predictions)
     #print(tuple(char_proposals))
-    print(char_proposals)
+    #print(char_proposals)
     # find every possible combination of possible characters
     combinations = list(itertools.product(*char_proposals))
-    print(len(stats), "words, ", str(len(combinations)), " possible combinations")
+    #print(len(stats), "words, ", str(len(combinations)), " possible combinations")
 
     # find the most frequent combination
     combi_freqs = []
@@ -134,7 +188,7 @@ def recognize_word(word):
         freq = compute_frequency(word_string.split('_'), n_chars, names, freqs)
         freq = penalty * freq
         combi_freqs.append([freq,word_string])
-        print('Total:', freq)
+        #print('Total:', freq)
 
     # return the most frequent combination
     mx = 0
