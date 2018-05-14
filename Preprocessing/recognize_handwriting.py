@@ -92,14 +92,7 @@ def extract_parchment(image, grey_thre):
     parchment = binarization(parchment)
     parchment.dtype='uint8'
     parchment[(parchment > 0)] = 255
-   
-    parchment = 255 - parchment
-    n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(parchment, 8, cv2.CV_32S)
-    # fuse the black background with the white parchment
-    parchment = 255 - parchment
-    parchment[labels == 1] = 255
-    print(stats)
-    #_,parchment = cv2.threshold(parchment, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+
     return parchment
 
 def binarization(parchment):
@@ -152,8 +145,33 @@ def segment_words(parchment):
 
 # extract lines/sentences from the parchment, based on the average height of the boxes
 def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
+    img_to_find_background = parchment.copy()
+    k_size_y = int(avg_height / 2)
+    k_size_x = int(avg_width / 2)
+    k2_size_y = int(avg_height / 5)
+    k2_size_x = int(avg_width / 5)
+    kernel = np.ones((k_size_y, k_size_x), np.uint8)
+    kernel2 = np.ones((k2_size_y + 1, k2_size_x + 1), np.uint8)
+    kernel3 = np.ones((k2_size_y, k2_size_x), np.uint8)
+
+    img_to_find_background = cv2.morphologyEx(img_to_find_background, cv2.MORPH_CLOSE, kernel2)
+    img_to_find_background = cv2.morphologyEx(img_to_find_background, cv2.MORPH_OPEN, kernel3)
+    img_to_find_background = cv2.morphologyEx(img_to_find_background, cv2.MORPH_CLOSE, kernel)
+    # parchment = 255 - parchment
+    n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_to_find_background, 8, cv2.CV_32S)
+
+    trg_label = 0
+    for i in range(len(stats)):
+        if stats[i][0] == 0 and stats[i][1] == 0:
+            trg_label = i
+    # fuse the black background with the white parchment
+    # parchment = 255 - parchment
+    parchment[labels == trg_label] = 255
+    # _,parchment = cv2.threshold(parchment, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+
+
     height, width = parchment.shape
-    line_image = np.array(parchment)
+    line_image = parchment.copy()
     """word_lines = []
     line = []
     # add first box to first line
@@ -193,7 +211,7 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
     return strips"""
     
     box_threshold  = avg_height * 2
-    line_count_threshold = 1
+    line_count_threshold = 2
 
     word_lines = []
     line = []
@@ -285,7 +303,7 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
     #plt.figure(figsize = (500,10))
     #plt.imshow(parchment, cmap='gray', aspect = 1)
     #plt.show()
-    return strips
+    return strips, parchment, line_image
 
 def extract_words(strip):
     kernel = np.ones((5,5),np.uint8)
@@ -444,14 +462,18 @@ def recognize_handwriting(image):
     # extract the binarized parchment from the image
     parchment = extract_parchment(image, 100)
     # detect words and characters in the parchment
-    boxes, centroids, avg_height, avg_width = segment_words(parchment)
+    boxes, centroids, avg_height, avg_width = segment_words(parchment.copy())
     # divide parchment into line strips containing words and characters
-    strips = segment_line_strips(boxes, centroids, parchment, avg_height, avg_width)
+    strips, whitened_parchment, line_image = segment_line_strips(boxes, centroids, parchment, avg_height, avg_width)
     #for each line strip, split words into characters and recognize characters
-    kernel = np.ones((5,5),np.uint8)
-    parchment_morphed = cv2.morphologyEx(parchment, cv2.MORPH_CLOSE, kernel)
+    k_size = int(avg_height / 10)
+    kernel = np.ones((k_size,k_size),np.uint8)
+    parchment_morphed = cv2.morphologyEx(whitened_parchment, cv2.MORPH_CLOSE, kernel)
     #parchment_morphed = cv2.morphologyEx(parchment_morphed, cv2.MORPH_OPEN, kernel)
-    
+
+    plt.figure(figsize=(500, 10))
+    plt.imshow(line_image, cmap='gray', aspect=1)
+    plt.show()
     plt.figure(figsize = (500,10))
     plt.imshow(parchment_morphed, cmap='gray', aspect = 1)
     plt.show()
