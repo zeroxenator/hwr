@@ -1,8 +1,17 @@
 import os
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 # find the most likely character by template matching
 def recognize_character(char):
+    print("Recognizing the following character:")
+    #kernel = np.ones((3,3),np.uint8)
+    #char = cv2.erode(char, kernel, iterations = 1)
+    
+    plt.figure(figsize = (500,4))
+    plt.imshow(char, cmap='gray', aspect = 1)
+    plt.show()
+    #print("Actual width:", char.shape[1])
     ch_height, ch_width = char.shape
     # add zero padding to left and right side, to allow for
     # correlation sliding
