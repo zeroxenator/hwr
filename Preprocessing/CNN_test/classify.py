@@ -2,6 +2,7 @@ import tensorflow as tf
 import sys
 import os
 import tkinter as tk
+import cv2
 from tkinter import filedialog
 
 # Disable tensorflow compilation warnings
@@ -48,5 +49,8 @@ def recognition_char(image):
 
 
 image_path = 'E:/Github/HandwritingRec/Preprocessing/CNN_test/test2.jpg'
+# invert_image = 255 - cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+# cv2.imwrite(image_path, invert_image)
+
 image = image_data = tf.gfile.FastGFile(image_path, 'rb').read()
 recognition_char(image)

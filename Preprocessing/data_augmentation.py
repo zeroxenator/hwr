@@ -8,18 +8,24 @@ import matplotlib.image as mpimg
 
 
 def load_batch():
-    base_path = 'E:/Github/HandwritingRec/Preprocessing/monkbrill_jpg'
-    target_path = 'E:/Github/HandwritingRec/Preprocessing/monkbrill_aug'
-    os.chdir(base_path)
+    base_path = 'monkbrill_jpg'
+    target_folder = 'monkbrill_aug'
+    root_dir = os.getcwd()
+    source_dir = os.path.join(root_dir, base_path)
+    target_dir = os.path.join(root_dir, target_folder)
+
+    os.chdir(source_dir)
     all_subdirs = [d for d in os.listdir('.') if os.path.isdir(d)]
     test_flag = True
+
     for dirs in all_subdirs:
         if test_flag:
             test_flag = False
-            dir = os.path.join(base_path, dirs)
-            target_dir = os.path.join(target_path, dirs)
-            os.makedirs(target_dir)
-            os.chdir(dir)
+            ind_src_dir = os.path.join(source_dir, dirs)
+            ind_trg_dir = os.path.join(target_dir, dirs)
+            os.makedirs(ind_trg_dir)
+            os.chdir(ind_src_dir)
+            dir = os.getcwd()
 
             file_index = 0
             for (file) in os.listdir(dir):
@@ -27,23 +33,17 @@ def load_batch():
                 image = cv2.imread(final_path, cv2.IMREAD_GRAYSCALE)
                 auged_images = image_aug(np.array([image]))
 
-                # image = np.append(image, np.array([image.shape[0]]))
-                # image = np.append(image, np.array([image.shape[1]]))
-                # image_list.append(image)
-
-                # augmentation
-                # list of aug images
-            # auged_images = image_aug(np.array(image_list))
-
-            # loop images to save
+                # loop images to save
                 for i in range(len(auged_images)):
-                    save_path = os.path.join(target_dir, str(file_index) + '_' + str(i))
+                    save_path = os.path.join(ind_trg_dir, str(file_index) + '_' + str(i))
                     cv2.imwrite(save_path + '.jpg', auged_images[i][0])
                 file_index += 1
 
 
 def image_aug(image):
     images_aug = []
+    inverter = np.vectorize(lambda img: 255 - img)
+    inv_image = inverter(image.copy())
 
 # rotate certain degree
 # shift (translate)
@@ -54,27 +54,40 @@ def image_aug(image):
 #
 # shear
 # simple noise alpha with edge detect (1.0)
+    sometimes = lambda aug: iaa.Sometimes(0.8, aug)
 
-    seq1 = iaa.Sequential([iaa.GaussianBlur(sigma=(0, 3.0))])
-    seq2 = iaa.Sequential([iaa.Affine(rotate=(-30, 30))])
-    seq3 = iaa.Sequential([iaa.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)})])
-    seq4 = iaa.Sequential([iaa.Affine(scale={"x": (0.8, 1.2), "y": (0.8, 1.2)})])
-    seq5 = iaa.Sequential([iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5)])
-    seq6 = iaa.Sequential([iaa.CoarseDropout((0.1, 0.2), size_percent=(0.02, 0.05), per_channel=0.2)])
+    seq1 = iaa.Sequential([
+        sometimes(iaa.GaussianBlur(sigma=(0, 3.0)))
+    ])
+    seq2 = iaa.Sequential([
+        sometimes(iaa.Affine(rotate=(-30, 30)))
+    ])
+    seq3 = iaa.Sequential([
+        sometimes(iaa.Affine(translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}))
+    ])
+    seq4 = iaa.Sequential([
+        sometimes(iaa.Affine(scale={"x": (0.8, 1.2), "y": (0.8, 1.2)}))
+    ])
+    seq5 = iaa.Sequential([
+        sometimes(iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5))
+    ])
+    seq6 = iaa.Sequential([
+        sometimes(iaa.CoarseDropout((0.04, 0.05), size_percent=(0.02, 0.05), per_channel=0.1))
+    ])
 
     images_aug1 = seq1.augment_images(image)
     images_aug2 = seq2.augment_images(image)
     images_aug3 = seq3.augment_images(image)
     images_aug4 = seq4.augment_images(image)
     images_aug5 = seq5.augment_images(image)
-    images_aug6 = seq6.augment_images(image)
+    images_aug6 = seq6.augment_images(inv_image)
 
     images_aug.append(images_aug1)
     images_aug.append(images_aug2)
     images_aug.append(images_aug3)
     images_aug.append(images_aug4)
     images_aug.append(images_aug5)
-    images_aug.append(images_aug6)
+    images_aug.append(inverter(images_aug6))
 
     return images_aug
 
