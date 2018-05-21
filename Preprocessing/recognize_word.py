@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from recognize_character import *
+from recognize_character_cnn import *
 
 # for each ngram, check if they occur as ngrams for words in the ngram file
 def find_Ngram(gram, current_n, names, frequencies):
@@ -19,10 +19,7 @@ def find_Ngram(gram, current_n, names, frequencies):
             count += proportion * frequencies[index]
     #print(gram, 'weighted frequency:',  count)
     return count
-            
-        
-        
-    
+
 
 
 # compute the frequency of the word by summing the frequency of all of its ngrams

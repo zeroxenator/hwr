@@ -492,7 +492,3 @@ def recognize_handwriting(image):
             # recognize the characters in the word
             #for character in characters:
                 #recognize_characters(characters)
-            
-        
-    
-        
