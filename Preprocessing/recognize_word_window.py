@@ -50,13 +50,13 @@ def recognize_word(word, avg_width):
         if(component[2] > (avg_width * 1.4)):
             print("Component is big: use sliding window!")
             # add zero padding to the left and right of image
-            padding = np.zeros((component_image.shape[0], int(component_image.shape[1] / 6)))
+            padding = np.zeros((component_image.shape[0], int(component_image.shape[1]/6)))
             component_image = np.concatenate((padding,component_image), axis = 1)
             component_image = np.concatenate((component_image,padding), axis = 1)
             component_image = component_image.astype(np.uint8)
             
-           
-
+            window_width = int(component[2] / 2)
+            
             # show the augmented component image
             plt.imshow(component_image, cmap='gray', aspect = 1)
             plt.show()
