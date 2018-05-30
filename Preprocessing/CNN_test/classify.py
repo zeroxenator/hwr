@@ -24,11 +24,13 @@ root.withdraw()
 
 
 def recognition_char(image, user_defined_threshold=0.05):
+    if image is None:
+        return [], []
     # image as numpy array
     # image = to_rgb1b(image)
     image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
     # image = tf.convert_to_tensor(image, np.float32)
-    image = np.array(image)[:, :, 0:3]
+    # image = np.array(image)[:, :, 0:3]
 
     # image_path = sys.argv[1]
     # image_path = filedialog.askopenfilename()
