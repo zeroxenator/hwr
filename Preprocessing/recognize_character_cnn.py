@@ -13,15 +13,15 @@ def recognize_character(char):
 
     top_chars, top_scores = recognition_char(char, user_defined_threshold)
 
-    templates = [string.split('.')[0].lower() for string in os.listdir('templates')]
-    dict_chars = dict(zip(templates, range(len(templates))))
-    top_chars = [dict_chars[char.split(' ')[0]] for char in top_chars]
+    # templates = [string.split('.')[0].lower() for string in os.listdir('templates')]
+    # dict_chars = dict(zip(templates, range(len(templates))))
+    # top_chars = [dict_chars[char.split(' ')[0]] for char in top_chars]
     # print(top_chars)
 
     return top_chars, top_scores
 
-image_path = 'C:/Users/Andrew X/Documents/GitHub/handwriting_recognition/Preprocessing/CNN_test/test2.jpg'
-# image_path = 'C:/Users/Andrew X/Documents/GitHub/handwriting_recognition/Preprocessing/image-output/test18_binarized.jpg'
-image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-# recognize_handwriting(image)
-recognize_character(image)
+# image_path = 'C:/Users/Andrew X/Documents/GitHub/handwriting_recognition/Preprocessing/CNN_test/test2.jpg'
+# # image_path = 'C:/Users/Andrew X/Documents/GitHub/handwriting_recognition/Preprocessing/image-output/test18_binarized.jpg'
+# image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+# # recognize_handwriting(image)
+# recognize_character(image)
