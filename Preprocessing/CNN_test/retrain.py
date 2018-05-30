@@ -771,7 +771,7 @@ def add_final_training_ops(class_count, final_tensor_name, bottleneck_tensor):
   tf.summary.scalar('cross_entropy', cross_entropy_mean)
 
   with tf.name_scope('train'):
-    optimizer = tf.train.GradientDescentOptimizer(FLAGS.learning_rate)
+    optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
     train_step = optimizer.minimize(cross_entropy_mean)
 
   return (train_step, cross_entropy_mean, bottleneck_input, ground_truth_input,
@@ -1074,7 +1074,6 @@ if __name__ == '__main__':
       """,
       action='store_true'
   )
-  parser.add_argument(
       '--random_crop',
       type=int,
       default=0,

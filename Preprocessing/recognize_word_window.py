@@ -91,9 +91,11 @@ def recognize_word(word, avg_width):
                         
                         # go back one stride, unless the window is at the first position
                         if(window_x != 0):
-                            print("\nCharacter found at position", 0, ":")
+                            print("\nCharacter found at position", int((window_x - stride) / stride), ":")
                             window = component_image[window_y:window_y + component_image.shape[0], window_x - stride :window_x -stride + window_width]
-                        print("\nCharacter found at position", int((window_x - stride) / stride), ":")
+                        else:
+                            print("\nCharacter found at position", 0, ":")
+                        
                         
                         #show the window content
                         plt.figure(figsize = (500,4))

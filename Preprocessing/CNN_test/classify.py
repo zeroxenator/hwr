@@ -23,32 +23,30 @@ root.withdraw()
 #     return ret
 
 
-def recognition_char(image, user_defined_threshold=0.05):
-    if image is None:
-        return [], []
+
+# if image_path:
+#
+#     # Read the image_data
+#     image_data = tf.gfile.FastGFile(image_path, 'rb').read()
+#
+# Loads label file, strips off carriage return
+label_lines = [line.rstrip() for line in tf.gfile.GFile("CNN_test/tf_files/retrained_labels.txt")]
+
+# Unpersists graph from file
+with tf.gfile.FastGFile("CNN_test/tf_files/retrained_graph.pb", 'rb') as f:
+    graph_def = tf.GraphDef()
+    graph_def.ParseFromString(f.read())
+    _ = tf.import_graph_def(graph_def, name='')
+
+def recognition_char(image, user_defined_threshold):
     # image as numpy array
     # image = to_rgb1b(image)
     image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
     # image = tf.convert_to_tensor(image, np.float32)
-    # image = np.array(image)[:, :, 0:3]
+    image = np.array(image)[:, :, :]
 
     # image_path = sys.argv[1]
     # image_path = filedialog.askopenfilename()
-
-    # if image_path:
-    #
-    #     # Read the image_data
-    #     image_data = tf.gfile.FastGFile(image_path, 'rb').read()
-    #
-    # Loads label file, strips off carriage return
-    label_lines = [line.rstrip() for line
-                   in tf.gfile.GFile("CNN_test/tf_files/retrained_labels.txt")]
-
-    # Unpersists graph from file
-    with tf.gfile.FastGFile("CNN_test/tf_files/retrained_graph.pb", 'rb') as f:
-        graph_def = tf.GraphDef()
-        graph_def.ParseFromString(f.read())
-        _ = tf.import_graph_def(graph_def, name='')
 
     with tf.Session() as sess:
         # Feed the image_data as input to the graph and get first prediction
