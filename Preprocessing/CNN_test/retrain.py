@@ -1074,7 +1074,6 @@ if __name__ == '__main__':
       """,
       action='store_true'
   )
-  parser.add_argument(
       '--random_crop',
       type=int,
       default=0,

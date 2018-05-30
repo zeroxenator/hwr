@@ -48,7 +48,6 @@ def recognition_char(image, user_defined_threshold):
     # image_path = sys.argv[1]
     # image_path = filedialog.askopenfilename()
 
-
     with tf.Session() as sess:
         # Feed the image_data as input to the graph and get first prediction
         softmax_tensor = sess.graph.get_tensor_by_name('final_result:0')
