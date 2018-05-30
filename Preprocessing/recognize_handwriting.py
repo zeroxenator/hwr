@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_sauvola
 
-from recognize_word import *
+from recognize_word_window import *
 
 def extract_parchment(image, grey_thre):
     output_image = np.array(image, copy=True)  
@@ -463,6 +463,7 @@ def recognize_handwriting(image):
     parchment = extract_parchment(image, 100)
     # detect words and characters in the parchment
     boxes, centroids, avg_height, avg_width = segment_words(parchment.copy())
+    print("Average word height and width:", avg_height, avg_width)
     # divide parchment into line strips containing words and characters
     strips, whitened_parchment, line_image = segment_line_strips(boxes, centroids, parchment, avg_height, avg_width)
     #for each line strip, split words into characters and recognize characters
@@ -487,8 +488,7 @@ def recognize_handwriting(image):
             print("Recognizing the following word:")
             # extract the characters in the word
             #characters = extract_characters(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
-            answer = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
-            print("Answer:", answer)
+            recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
             # recognize the characters in the word
             #for character in characters:
                 #recognize_characters(characters)
