@@ -4,7 +4,6 @@ import itertools
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
 from recognize_character_cnn import *
 
 
@@ -196,8 +195,8 @@ def recognize_word(word, avg_width):
     # match the characters in the word
     char_proposals = [] 
     for char in chars:
-        # char = word[stat[1]:stat[1] + stat[3], stat[0]:stat[0]+stat[2]]
-        predictions = recognize_character(char)
+        #char = word[stat[1]:stat[1] + stat[3], stat[0]:stat[0]+stat[2]]
+        predictions, scores = recognize_character(char)
         char_proposals.append(predictions)
     # print(tuple(char_proposals))
     # print(char_proposals)
@@ -218,7 +217,8 @@ def recognize_word(word, avg_width):
         for char_index in combination:
             n_chars += 1
             # get the character name
-            ch = templates[char_index].split('.')[0]
+            print(char_index)
+            ch = templates[char_index]
             # add the character to the total word string
             word_string = word_string + ch + " "
         # reverse the string
