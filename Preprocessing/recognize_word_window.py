@@ -66,7 +66,7 @@ def recognize_word(word, avg_width):
     plt.imshow(word, cmap='gray', aspect = 1)
     plt.show()
     
-   
+
     # define how much the window moves each step
     stride = 2
     
