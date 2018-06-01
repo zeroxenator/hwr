@@ -79,7 +79,7 @@ def recognize_word(word, avg_width):
     word = 255 - word
     
 
-    kernel = np.ones((5,5),np.uint8)
+    kernel = np.ones((3,3),np.uint8)
    
     # find the connected components
     n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(word, 8, cv2.CV_32S)
@@ -152,7 +152,8 @@ def recognize_word(word, avg_width):
                         # go back one stride, unless the window is at the first position
                         if(window_x != 0):
                             print("\nCharacter found at position", int((window_x - stride) / stride), ":")
-                            window = component_image[window_y:window_y + component_image.shape[0], window_x - stride :window_x -stride + window_width]
+                            window = component_image[window_y:window_y + component_image.shape[0], window_x - stride :window_x -stride + window_width + 15]
+                            window = cv2.dilate(window ,kernel, iterations = 1)
                         else:
                             print("\nCharacter found at position", 0, ":")
                         
@@ -172,7 +173,7 @@ def recognize_word(word, avg_width):
                         # skip a few frames ahead, because next character
                         # won't be only a few pixels next to current character
                         #window_x += int(avg_width) - stride
-                        window_x += int(word_width / 2) - stride
+                        window_x += int(word_width / 2) - stride + 15
                         
                     
                     # if the amount of candidates is smaller, 
@@ -191,6 +192,7 @@ def recognize_word(word, avg_width):
         # which can be recognized immediately
         else:
             print("Component small enough,  proceed to recognition:")
+            component_image = cv2.dilate(component_image ,kernel, iterations = 1)
             plt.imshow(component_image, cmap='gray', aspect = 1)
             plt.show()
             top_chars, top_scores = recognize_character(component_image)
@@ -221,7 +223,14 @@ def recognize_word(word, avg_width):
     
     best = "_".join(list(combinations[best_freq_index]))
     print("Best word:", best)
-    return best
+    
+    if(best in names):
+        print("Best is in names!")
+        index = names.index(best)  
+        print(list(ngrams['Hebrew_character'])[index])
+        return list(ngrams['Hebrew_character'])[index]
+    else:
+        return best
         
   
         

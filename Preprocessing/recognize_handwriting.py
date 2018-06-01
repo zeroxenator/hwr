@@ -5,46 +5,7 @@ from skimage.filters import threshold_sauvola
 
 from recognize_word_window import *
 
-
-def find_peak(image, peak_window=5, grey_threshold=100):
-    hist = cv2.calcHist([image], [0], None, [256], [0, 256])
-    peak_kernel = peak_window // 2
-    peak_arr = np.zeros([peak_window, 1])
-    grey_threshold = grey_threshold if len(hist) > grey_threshold else len(hist)
-    rg = range(grey_threshold - (peak_window - 1))
-    list_peaks = []
-    for i in rg:
-        max_count = 0
-        for j in range(i, i + peak_window):
-            if max_count < hist[i]:
-                max_count = hist[i]
-
-        # find if the max is peak
-        peak_flag = True
-        for k in range(peak_kernel):
-            idx_diff = k + 1
-            idx_min = 0 if (i - idx_diff) < 0 else i - idx_diff
-            idx_max = len(hist) if (i + idx_diff) > len(hist) else i + idx_diff
-            if max_count <= hist[idx_min] or max_count <= hist[idx_max]:
-                peak_flag = False
-        if peak_flag:
-            list_peaks.append([i, max_count[0]])
-    list_peaks.sort(key=lambda x: x[1], reverse=True)
-    if len(list_peaks) >= 3:
-        threshold = (list_peaks[1][0] + list_peaks[2][0]) // 2
-    else:
-        threshold = grey_threshold
-    return threshold
-
-
 def extract_parchment(image, grey_thre):
-    # apply sauvola binarization to the threshold to get average box size
-    parchment = binarization(image)
-    parchment.dtype = 'uint8'
-    parchment[(parchment > 0)] = 255
-    boxes, centroids, avg_height, avg_width = segment_words(parchment, 5)
-    extract_k_size = int(avg_height)
-
     output_image = np.array(image, copy=True)  
     
     # set dark grey to black
@@ -87,10 +48,10 @@ def extract_parchment(image, grey_thre):
                 
     # closing again
     thresh_image = cv2.GaussianBlur(output_image,(5,5),0)
-    kernel = np.ones((extract_k_size*2, extract_k_size*2),np.uint8)
+    kernel = np.ones((80,80),np.uint8)
     thresh_image = cv2.morphologyEx(thresh_image, cv2.MORPH_CLOSE, kernel)
-    dilation_kernel = np.ones((extract_k_size,extract_k_size),np.uint8)
-    thresh_image = cv2.dilate(thresh_image,dilation_kernel,iterations=1)
+    dilation_kernel = np.ones((50,50),np.uint8)
+    thresh_image = cv2.dilate(thresh_image,dilation_kernel,iterations = 1)
     # connected component
     n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh_image, 8, cv2.CV_32S)
     area = stats[:,4]
@@ -132,7 +93,7 @@ def extract_parchment(image, grey_thre):
     parchment.dtype='uint8'
     parchment[(parchment > 0)] = 255
 
-    return parchment, extract_k_size
+    return parchment
 
 def binarization(parchment):
     blurred = cv2.GaussianBlur(parchment,(151,151),0)
@@ -143,17 +104,14 @@ def binarization(parchment):
     return binary_sauvola
 
 # find words and characters in the parchment and compute the average height and width
-def segment_words(parchment, kernel_size=5):
+def segment_words(parchment):
     #plt.figure(figsize = (500,4))
     #plt.imshow(parchment, cmap='gray', aspect = 1)
     #plt.show()
     
     # remove some noise from the sauvola binarized parchment
-    kernel = np.ones((kernel_size,kernel_size),np.uint8)
-    image_bin = cv2.morphologyEx(parchment, cv2.MORPH_OPEN, kernel)
-
-
-    # image_bin = cv2.morphologyEx(image_bin, cv2.MORPH_CLOSE, kernel)
+    kernel = np.ones((5,5),np.uint8)
+    image_bin = cv2.morphologyEx(parchment, cv2.MORPH_CLOSE, kernel)
     image_bin = 255 - image_bin
     # find connected components (words) from the parchment
     n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image_bin, 8, cv2.CV_32S)
@@ -185,7 +143,8 @@ def segment_words(parchment, kernel_size=5):
     
     return boxes, box_centroids, avg_height, avg_width
 
-def whiten_background(parchment, avg_height, avg_width):
+# extract lines/sentences from the parchment, based on the average height of the boxes
+def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
     img_to_find_background = parchment.copy()
     k_size_y = int(avg_height / 2)
     k_size_x = int(avg_width / 2)
@@ -194,30 +153,22 @@ def whiten_background(parchment, avg_height, avg_width):
     kernel = np.ones((k_size_y, k_size_x), np.uint8)
     kernel2 = np.ones((k2_size_y + 1, k2_size_x + 1), np.uint8)
     kernel3 = np.ones((k2_size_y, k2_size_x), np.uint8)
+
     img_to_find_background = cv2.morphologyEx(img_to_find_background, cv2.MORPH_CLOSE, kernel2)
     img_to_find_background = cv2.morphologyEx(img_to_find_background, cv2.MORPH_OPEN, kernel3)
     img_to_find_background = cv2.morphologyEx(img_to_find_background, cv2.MORPH_CLOSE, kernel)
     # parchment = 255 - parchment
     n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_to_find_background, 8, cv2.CV_32S)
-    height, width = parchment.shape
 
     trg_label = 0
     for i in range(len(stats)):
-        if stats[i][0] == 0 and stats[i][1] == 0 and stats[i][2] == width and stats[i][3] == height:
+        if stats[i][0] == 0 and stats[i][1] == 0:
             trg_label = i
     # fuse the black background with the white parchment
     # parchment = 255 - parchment
     parchment[labels == trg_label] = 255
+    # _,parchment = cv2.threshold(parchment, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
-    return parchment
-
-# extract lines/sentences from the parchment, based on the average height of the boxes
-def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
-    parchment = whiten_background(parchment, avg_height, avg_width)
-
-    # opening the parchment to make characters connected
-    k_size = int(avg_height / 9)
-    boxes, centroids, avg_height, avg_width = segment_words(parchment, k_size)
 
     height, width = parchment.shape
     line_image = parchment.copy()
@@ -259,8 +210,7 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
     
     return strips"""
     
-    box_threshold = avg_height * 1.9
-    box_min_threshold = avg_height * 0.6
+    box_threshold  = avg_height * 2
     line_count_threshold = 2
 
     word_lines = []
@@ -278,7 +228,7 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
         centroid_y = box[6]
         box_height = box[3]
 
-        if box_height < box_threshold and box_height > box_min_threshold:
+        if box_height < box_threshold:
             empty_flag = True
             for temp_line in word_lines:
                 temp_centroid = temp_line[0]
@@ -306,7 +256,7 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
         centroid_y = box[6]
         box_height = box[3]
 
-        if box_height < box_threshold and box_height > box_min_threshold:
+        if box_height < box_threshold:
             empty_flag = True
             for temp_line in word_lines:
                 temp_centroid = temp_line[0]
@@ -394,22 +344,19 @@ def write_line_to_file(words, path):
     
 
 # given a dead sea scroll, recognize the words contained within
-def recognize_handwriting(image):
-    thres = find_peak(image, 7, 100)
-    # extract the binarized parchment from the image based on box size
-    parchment, char_size = extract_parchment(image, thres)
+def recognize_handwriting(image, path):
+    # extract the binarized parchment from the image
+    parchment = extract_parchment(image, 100)
     # detect words and characters in the parchment
-    boxes, centroids, avg_height, avg_width = segment_words(parchment.copy(), char_size//9)
+    boxes, centroids, avg_height, avg_width = segment_words(parchment.copy())
     print("Average word height and width:", avg_height, avg_width)
     # divide parchment into line strips containing words and characters
     strips, whitened_parchment, line_image = segment_line_strips(boxes, centroids, parchment, avg_height, avg_width)
     #for each line strip, split words into characters and recognize characters
-    k_size = int(avg_height / 12)
-    kernel_open = np.ones((k_size,k_size),np.uint8)
-    kernel_close = np.ones((k_size - 1,k_size - 1),np.uint8)
-    parchment_morphed = cv2.morphologyEx(whitened_parchment, cv2.MORPH_OPEN, kernel_open)
-    parchment_morphed = cv2.morphologyEx(parchment_morphed, cv2.MORPH_CLOSE, kernel_close)
-
+    k_size = int(avg_height / 10)
+    kernel = np.ones((k_size,k_size),np.uint8)
+    parchment_morphed = cv2.morphologyEx(whitened_parchment, cv2.MORPH_CLOSE, kernel)
+    #parchment_morphed = cv2.morphologyEx(parchment_morphed, cv2.MORPH_OPEN, kernel)
 
     plt.figure(figsize=(500, 10))
     plt.imshow(line_image, cmap='gray', aspect=1)
@@ -432,3 +379,4 @@ def recognize_handwriting(image):
             recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
             recognized_words.append(recognized_word)
         write_line_to_file(recognized_words, path)
+             
