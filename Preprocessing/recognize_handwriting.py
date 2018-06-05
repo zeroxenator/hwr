@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from skimage.filters import threshold_sauvola
 
 from recognize_word_window import *
+from markov_chain_ngram import *
 
 def extract_parchment(image, grey_thre):
     output_image = np.array(image, copy=True)  
@@ -117,7 +118,7 @@ def segment_words(parchment):
     n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image_bin, 8, cv2.CV_32S)
     image_bin = 255 - image_bin
     # get the components that are likely to be words/characters
-    min_thresh = 400
+    min_thresh = 600
     max_thresh = 10000
     boxes = []
     box_centroids = []
@@ -140,6 +141,10 @@ def segment_words(parchment):
         avg_height += box[3]
     avg_width /= N
     avg_height /= N
+    
+  
+    
+    
     
     return boxes, box_centroids, avg_height, avg_width
 
@@ -333,8 +338,9 @@ def extract_words(strip):
 
        
 def write_line_to_file(words, path):
-    name = "test7"
-    f= open("recog_output/" + name + ".txt" ,"a+")
+    name = path.split('/')[1].split('.')[0]
+    print(name)
+    f= open("recog_output/" + name + ".txt","a+", encoding="utf-8")
     for word in words:
         f.write(word + " ")
     f.write("\n")
@@ -344,7 +350,12 @@ def write_line_to_file(words, path):
     
 
 # given a dead sea scroll, recognize the words contained within
-def recognize_handwriting(image, path):
+def recognize_handwriting(image, path, plot):
+    # get markov transition matrix and initial probability vector
+    all_prob, first_chars_prob = get_markov()
+    #print("Transition matrix:", all_prob)
+    #print("Initial prob vector:", first_chars_prob)
+    
     # extract the binarized parchment from the image
     parchment = extract_parchment(image, 100)
     # detect words and characters in the parchment
@@ -357,13 +368,14 @@ def recognize_handwriting(image, path):
     kernel = np.ones((k_size,k_size),np.uint8)
     parchment_morphed = cv2.morphologyEx(whitened_parchment, cv2.MORPH_CLOSE, kernel)
     #parchment_morphed = cv2.morphologyEx(parchment_morphed, cv2.MORPH_OPEN, kernel)
-
-    plt.figure(figsize=(500, 10))
-    plt.imshow(line_image, cmap='gray', aspect=1)
-    plt.show()
-    plt.figure(figsize = (500,10))
-    plt.imshow(parchment_morphed, cmap='gray', aspect = 1)
-    plt.show()
+    
+    if(plot):
+        plt.figure(figsize=(500, 10))
+        plt.imshow(line_image, cmap='gray', aspect=1)
+        plt.show()
+        plt.figure(figsize = (500,10))
+        plt.imshow(parchment_morphed, cmap='gray', aspect = 1)
+        plt.show()
     
     for strip in strips:
         recognized_words = []
@@ -376,7 +388,7 @@ def recognize_handwriting(image, path):
             print("Recognizing the following word:")
             # extract the characters in the word
             #characters = extract_characters(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
-            recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
+            recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width,  all_prob, first_chars_prob, plot)
             recognized_words.append(recognized_word)
         write_line_to_file(recognized_words, path)
              
