@@ -332,133 +332,19 @@ def extract_words(strip):
     return words
 
        
-# given a word, segment and return the characters within
-"""def extract_characters(word, avg_width):
-    word = 255 - word
-    avg_width = int(avg_width)
-    height, width = word.shape
-    # use a window and find the black minima within for segmentation
-   # window_x = 0
-    #window_x2 = avg_width
-  
+def write_line_to_file(words, path):
+    name = "test7"
+    f= open("recog_output/" + name + ".txt" ,"a+")
+    for word in words:
+        f.write(word + " ")
+    f.write("\n")
     
-    cutoff_points = []
-    characters = []
-    kernel = np.ones((3,3),np.uint8)
-    word = cv2.dilate(word, kernel, iterations = 1)
-    word = cv2.erode(word, kernel, iterations = 2)
-    # find connected components (characters and connected characters)
-    n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(word, 8, cv2.CV_32S)
-    stats = stats[1:]
-    components = []
-    for i in range(len(stats)):
-        if(stats[i][2] >= 20 and stats[i][2] <= avg_width):
-            components.append(stats[i])
-    
-    word = 255 - word
-    print()
-    print("New character:")
-    plt.figure(figsize = (500,4))
-    plt.imshow(word, cmap='gray', aspect = 1)
-    plt.show()
-    
-    for i in range(len(stats)):
-        # if character is too big, it is likely a bunch of characters that are connected
-        # try to seperate them
-        if(stats[i][2] > (1.5 * avg_width)):
-            print('TOO BIG; MULTIPLE CHARACTERS!')
             
-        # otherwise, it's probably one character
-        else:
-            characters.append(word[:, stats[i][0]: stats[i][0] + stats[i][2]])
-        
+            
     
-    # try to seperate characters that are too wide, as they are possibly multiple connected characters
-    connected_characters = []
-    for i in range(len(components)):
-        if(stats[i][2] >= avg_width):
-            connected_characters.append(i)
-        # if no separation is necessary, just append the found component
-        else:
-            characters.append(word[:, components[i][0]:components[i][0] + components[i][2]])
-          
-
-    for component in connected_characters:
-        histogram = np.zeros(width)
-        # count black pixels for every column of the characer(s)
-        for i in range(width):
-            histogram[i] = height - np.count_nonzero(word[:, i])
-        mx = max(histogram)
-        mn = min(histogram)
-        avg = np.mean(histogram)
-        std = np.std(histogram)
-        
-        # if a column has too few black pixels, separate the two components
-        for i in range(len(histogram)):
-            if(histogram[i] <= (avg - (1.2 * std))): 
-                cutoff_points.append(i)
-        # if separation is needed, separate the component using all the found
-        # cutoff points
-        x1 = 0
-        x2 = 0
-        for point in cutoff_points:
-            x2 = point
-            characters.append(word[:, x1:x2])
-            x1 = point
-        characters.append(word[:, x1:])
-        # if no separation is necessary, just append the found component
-        
-        
-        
-        
-           
-        
-    while(window_x2 <= width):
-        window = word[0:height, window_x:window_x2]
-        window_x += avg_width
-        window_x2 += avg_width
-        plt.figure(figsize = (500,4))
-        plt.imshow(window, cmap='gray', aspect = 1)
-        plt.show()
-        
-        
-        histogram = np.zeros(width)
-        # count black pixels for every column of the window
-        for i in range(width):
-            histogram[i] = height - np.count_nonzero(word[:, i])
-        # find minima
-        mx = max(histogram)
-        mn = min(histogram)
-        avg = np.mean(histogram)
-        std = np.std(histogram)
-        for i in range(len(histogram)):
-            if(histogram[i] <= (avg - (2 * std))):           
-                cutoff_points.append(i)
-        
-    cutoff_points.append(width-1)
-    
-        
-   # use the cutoff points to cut the characters from the word image
-    characters = []
-    x1 = cutoff_points[0]
-    x2 = 0
-        for i in range(len(cutoff_points)):
-        x2 = cutoff_points[i]
-        characters.append(word[:, x1:x2])
-    
-    for character in characters:
-        if(character.shape[1] > 15):
-            print("Found characters:")
-            plt.figure(figsize = (500,4))
-            plt.imshow(character, cmap='gray', aspect = 1)
-            plt.show()
-
-    
-    """
-
 
 # given a dead sea scroll, recognize the words contained within
-def recognize_handwriting(image):
+def recognize_handwriting(image, path):
     # extract the binarized parchment from the image
     parchment = extract_parchment(image, 100)
     # detect words and characters in the parchment
@@ -478,7 +364,9 @@ def recognize_handwriting(image):
     plt.figure(figsize = (500,10))
     plt.imshow(parchment_morphed, cmap='gray', aspect = 1)
     plt.show()
+    
     for strip in strips:
+        recognized_words = []
         """plt.figure(figsize = (500,4))
         plt.imshow(parchment[strip[0]:strip[1], :], cmap='gray', aspect = 1)
         plt.show()"""
@@ -488,7 +376,7 @@ def recognize_handwriting(image):
             print("Recognizing the following word:")
             # extract the characters in the word
             #characters = extract_characters(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
-            recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
-            # recognize the characters in the word
-            #for character in characters:
-                #recognize_characters(characters)
+            recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
+            recognized_words.append(recognized_word)
+        write_line_to_file(recognized_words, path)
+             
