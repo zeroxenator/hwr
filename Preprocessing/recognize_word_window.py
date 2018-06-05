@@ -59,12 +59,13 @@ def compute_frequency(word_string, n_chars, names, frequencies):
 
 # recognize the characters in a word by sliding a window across big
 # connected components and recognizing characters within
-def recognize_word(word, avg_width):
+def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
     
     # show the word
-    plt.figure(figsize = (500,4))
-    plt.imshow(word, cmap='gray', aspect = 1)
-    plt.show()
+    if(plot):
+        plt.figure(figsize = (500,4))
+        plt.imshow(word, cmap='gray', aspect = 1)
+        plt.show()
     
 
     # define how much the window moves each step
@@ -91,7 +92,7 @@ def recognize_word(word, avg_width):
     # plot all components
     for stat in stats:
         
-        if(stat[2] > (0.5 * avg_width) and stat[3] > (0.5 * avg_width) and stat[2] < (avg_width * 5) and stat[3] < (avg_width * 5)):
+        if(stat[2] > (0.4 * avg_width) and stat[3] > (0.2 * avg_width) and stat[2] < (avg_width * 5) and stat[3] < (avg_width * 5)):
             print(stat[0])
             components.append(stat)
           
@@ -118,8 +119,9 @@ def recognize_word(word, avg_width):
             window_width = int(component[2] / 2)
             
             # show the augmented component image
-            plt.imshow(component_image, cmap='gray', aspect = 1)
-            plt.show()
+            if(plot):
+                plt.imshow(component_image, cmap='gray', aspect = 1)
+                plt.show()
 
             # slide the window across the image, until the end of the image
             # has been reached
@@ -127,14 +129,17 @@ def recognize_word(word, avg_width):
             # show initial window content
             window = component_image[window_y:window_y + component_image.shape[0], window_x:window_x + window_width]
             print("Initial window:")
-            plt.figure(figsize = (500,4))
-            plt.imshow(window, cmap='gray', aspect = 1)
-            plt.show()
+            if(plot):
+                plt.figure(figsize = (500,4))
+                plt.imshow(window, cmap='gray', aspect = 1)
+                plt.show()
             
             # keep track of how many candidates there are per window classification
             N_candidates = 0
             previous_N = 100
             possible_character = False
+            
+            window_chars = []
             while((window_x + window_width) <= component_image.shape[1]):
                 window = component_image[window_y:window_y + component_image.shape[0], window_x:window_x + window_width]
                 # skip complete empty windows
@@ -159,12 +164,16 @@ def recognize_word(word, avg_width):
                         
                         
                         #show the window content
-                        plt.figure(figsize = (500,4))
-                        plt.imshow(window, cmap='gray', aspect = 1)
-                        plt.show()
+                        if(plot):
+                            plt.figure(figsize = (500,4))
+                            plt.imshow(window, cmap='gray', aspect = 1)
+                            plt.show()
                         
                         top_chars, top_scores = recognize_character(window)
-                        candidates.append(top_chars)
+                        
+                        # store window-slided detected characters: these need to be stored in the reversed order later
+                        window_chars.append(top_chars)
+                        #candidates.append(top_chars)
                         
                         print("Recognition result:", top_chars, top_scores)
                         print("---------------------------------------------------\n")
@@ -188,14 +197,35 @@ def recognize_word(word, avg_width):
                     previous_N = N_candidates
 
                 window_x += stride
+                
+            window_chars.reverse()
+            for character in window_chars:
+                candidates.append(character)
         # else, sliding is not necessary as the component is probably just a character,
         # which can be recognized immediately
         else:
             print("Component small enough,  proceed to recognition:")
-            component_image = cv2.dilate(component_image ,kernel, iterations = 1)
-            plt.imshow(component_image, cmap='gray', aspect = 1)
-            plt.show()
-            top_chars, top_scores = recognize_character(component_image)
+            # put a window around the component
+            #width = 0
+            #height = 0
+            """if(component[2] > window_width):
+                width = component[2]
+            else:
+                width = window_width"""
+                
+            if(component[3] > window_height):
+                height = component[3]
+            else:
+                height = window_height
+            
+            
+           
+            window = word[component[1]:component[1] + height, component[0]:component[0] + component[2]]
+            window = cv2.dilate(window ,kernel, iterations = 1)
+            if(plot):
+                plt.imshow(window, cmap='gray', aspect = 1)
+                plt.show()
+            top_chars, top_scores = recognize_character(window)
             candidates.append(top_chars)
             print("Recognition result:", top_chars, top_scores)
             print("---------------------------------------------------\n")
@@ -211,17 +241,42 @@ def recognize_word(word, avg_width):
     freqs = list(ngrams['Frequencies'])
     names = list(map(lambda x: x.lower(), names))
     
-    best_freq_index = 0
-    best_freq = 0
+    best_prob_index = 0
+    best_prob = 0
+    
+    combi_props = []
+    
+    
+    
     
     for combi in combinations:    
-        freq = compute_frequency("_".join(combi), len(candidates), names, freqs)
-        if(freq > best_freq):
-            best_freq = freq
-            best_freq_index = combinations.index(combi)
-        print("Combi:", combi, "Frequency:", freq)
+        #freq = compute_frequency("_".join(combi), len(candidates), names, freqs)
+        
+        # first, get the probability of a word starting with the character\     
+        try:
+            prob = start_vector[combi[-1]]
+        except:
+            prob = 0
+            
+        # multiply the starting probability with the transition probabilities
+        for i in range(len(combi) - 1):
+            current_char = combi[i]
+            next_character = combi[i + 1]
+            try:
+                prob *= trans_matrix[current_char][next_character]
+            except:
+                prob = 0
+        
+                
+   
+        if(prob > best_prob):
+            #best_freq = freq
+            #best_freq_index = combinations.index(combi)        
+            best_prob = prob
+            best_prob_index = combinations.index(combi)
+        print("Combi:", combi, "Probability:", prob)
     
-    best = "_".join(list(combinations[best_freq_index]))
+    best = "_".join(list(combinations[best_prob_index]))
     print("Best word:", best)
     
     if(best in names):
@@ -229,8 +284,9 @@ def recognize_word(word, avg_width):
         index = names.index(best)  
         print(list(ngrams['Hebrew_character'])[index])
         return list(ngrams['Hebrew_character'])[index]
+        #return best
     else:
-        return best
+        return ""
         
   
         
