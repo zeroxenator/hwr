@@ -337,20 +337,44 @@ def extract_words(strip):
     return words
 
        
-def write_line_to_file(words, path):
+def write_line_to_file(words, path, codes):
     name = path.split('/')[1].split('.')[0]
     print(name)
     f= open("recog_output/" + name + ".txt","a+", encoding="utf-8")
     for word in words:
-        f.write(word + " ")
+        if(type(word) == list):
+            new_word = ""
+            for ch in word:
+                try:
+                    code = codes[ch]
+                except:
+                    print("Something empty somehow ended up here..")
+                    continue
+                print("ch:", ch)
+                print("code:", code)
+                print("chr:", chr(code))
+                new_word = new_word + chr(code)
+            f.write(new_word + " ")
+            
+        else:    
+            f.write(word + " ")
     f.write("\n")
     
             
+def create_char_codes():
+    codes = {}
+    codes = {"alef": 1488, "ayin": 1506,  "bet": 1489,  "dalet": 1491,  "gimel": 1490,  "he": 1492,  "het": 1495, 
+             "kaf": 1499,  "kaf-final": 1498,  "lamed": 1500,  "mem": 1501,  "mem-medial": 1502,  "nun-final": 1503, 
+             "nun-medial": 1504,  "pe": 1508,  "pe-final": 1507,  "qof": 1511,  "resh": 1512,  "samekh": 1505,  "shin": 1513, 
+             "taw": 1514,  "tet": 1496,  "tsadi-final": 1509,  "tsadi-medial": 1510,  "waw": 1493,  "yod": 1497,  "zayin": 1494
+    }
+    return codes
             
     
 
 # given a dead sea scroll, recognize the words contained within
 def recognize_handwriting(image, path, plot):
+    character_codes = create_char_codes()
     # get markov transition matrix and initial probability vector
     all_prob, first_chars_prob = get_markov()
     #print("Transition matrix:", all_prob)
@@ -390,5 +414,5 @@ def recognize_handwriting(image, path, plot):
             #characters = extract_characters(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
             recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width,  all_prob, first_chars_prob, plot)
             recognized_words.append(recognized_word)
-        write_line_to_file(recognized_words, path)
+        write_line_to_file(recognized_words, path, character_codes)
              

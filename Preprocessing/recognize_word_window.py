@@ -280,13 +280,17 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
     print("Best word:", best)
     
     if(best in names):
-        print("Best is in names!")
         index = names.index(best)  
         print(list(ngrams['Hebrew_character'])[index])
         return list(ngrams['Hebrew_character'])[index]
         #return best
     else:
-        return ""
+        # if word is not in ngrams, write all of its characters to file
+        best = best.split('_')
+        #if(len(best) > 1):
+            #best.reverse()
+        print("Best?!:", best)
+        return best
         
   
         
