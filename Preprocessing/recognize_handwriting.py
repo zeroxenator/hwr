@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_sauvola
+from scipy.ndimage import rotate
 
 from recognize_word_window import *
 from markov_chain_ngram import *
@@ -142,11 +143,39 @@ def segment_words(parchment):
     avg_width /= N
     avg_height /= N
     
-  
-    
-    
     
     return boxes, box_centroids, avg_height, avg_width
+
+
+def rotate_img(img, degree=10, interval=1):
+    degree_start = abs(degree)
+    degree_end = -(degree_start + 1)
+    interval = int(interval)
+    if interval < 1:
+        raise ValueError(
+            "parameter interval should be at least 1, now it's {}".format(interval))
+
+    images_to_return = []
+    for i in range(degree_start, degree_end, -interval):
+        processed = img.copy()
+        processed = rotate(processed, i, reshape=True, cval=255)
+        images_to_return.append(processed)
+    return images_to_return
+
+
+def rotation_procedure(image):
+    rotated_img_list = rotate_img(image, 10, 1)
+    best_img = image.copy()
+    for rotated_img in rotated_img_list:
+        # write or include the histagram function here to all images
+        #         plt.figure(figsize = (500,10))
+        #         plt.imshow(rotated_img, cmap='gray', aspect = 1)
+        #         plt.show()
+        best_img = rotated_img
+
+    line_strips = []
+    return best_img, line_strips
+
 
 # extract lines/sentences from the parchment, based on the average height of the boxes
 def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
@@ -415,4 +444,15 @@ def recognize_handwriting(image, path, plot):
             recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width,  all_prob, first_chars_prob, plot)
             recognized_words.append(recognized_word)
         write_line_to_file(recognized_words, path, character_codes)
-             
+
+
+# remove the codes below in case they're there
+# path = 'image-data/test17.jpg'
+# image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+# parchment = extract_parchment(image, 100)
+# # detect words and characters in the parchment
+# boxes, centroids, avg_height, avg_width = segment_words(parchment.copy())
+# print("Average word height and width:", avg_height, avg_width)
+# # divide parchment into line strips containing words and characters
+# strips, whitened_parchment, line_image = segment_line_strips(boxes, centroids, parchment, avg_height, avg_width)
+# rotation_procedure(whitened_parchment)
