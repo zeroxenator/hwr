@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_sauvola
 
+from scipy.ndimage import rotate
 from recognize_word_window import *
 from markov_chain_ngram import *
 
@@ -175,8 +176,10 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
     # _,parchment = cv2.threshold(parchment, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
 
-    height, width = parchment.shape
+    height, width = parchment.shape    
+    parchment, na, na2 = rotation_procedure(parchment.copy(), avg_height)
     line_image = parchment.copy()
+    
     """word_lines = []
     line = []
     # add first box to first line
@@ -214,6 +217,8 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
         strips.append(parchment[min_height:max_height, :])
     
     return strips"""
+    
+    boxes, centroids, avg_height, avg_width = segment_words(parchment)
     
     box_threshold  = avg_height * 2
     line_count_threshold = 2
@@ -345,9 +350,86 @@ def write_line_to_file(words, path):
         f.write(word + " ")
     f.write("\n")
     
-            
-            
+def find_peak(hist, peak_window=5, grey_threshold=100):
+    peak_kernel = peak_window // 2
+    rg = range(len(hist))
+    list_peaks = []
+    for i in rg:
+        max_count = 0
+        for j in range(i, i + peak_window):
+            if max_count < hist[i]:
+                max_count = hist[i]
+
+        # find if the max is peak
+        peak_flag = True
+        for k in range(peak_kernel):
+            idx_diff = k + 1
+            idx_min = 0 if (i - idx_diff) < 0 else i - idx_diff
+            idx_max = (len(hist)-1) if (i + idx_diff) > (len(hist)-1) else i + idx_diff
+            if max_count <= hist[idx_min] or max_count <= hist[idx_max]:
+                peak_flag = False
+        if peak_flag:
+            list_peaks.append([i, max_count])
+#     list_peaks.sort(key=lambda x: x[1], reverse=True)
     
+    return list_peaks
+
+def rotate_img(img, degree=10, interval=1):
+    degree_start = abs(degree)
+    degree_end = -(degree_start + 1)
+    interval = int(interval)
+    if interval < 1:
+        raise ValueError(
+                "parameter interval should be at least 1, now it's {}".format(interval))
+    
+    images_to_return = []
+    for i in range(degree_start, degree_end, -interval):
+        processed = img.copy()    
+        processed = rotate(processed, i, reshape=True, cval=255)
+        images_to_return.append(processed)
+    return images_to_return
+            
+def rotation_procedure(image, avg_height):
+    rotated_img_list = rotate_img(image, 10, 1)
+    best_img = image.copy()
+    line_strips = []
+    max_range = 0    
+    for rotated_img in rotated_img_list:
+        
+      # verticalProfile = np.sum(whitened_parchment, axis=0)
+        horizontalProfile = np.sum(rotated_img, axis=1)        
+        temp_max_range = horizontalProfile.max() - horizontalProfile.min()
+        
+        if temp_max_range > max_range:
+            max_range = temp_max_range
+            best_img = rotated_img
+            best_horizontalProfile = horizontalProfile
+            # plt.plot(range(0,columns), verticalProfile)
+
+#     [rows, columns] = best_img.shape
+#     plt.plot(best_horizontalProfile, range(0,rows))
+#     plt.show()
+    # adjust window size
+    peak_list = find_peak(best_horizontalProfile, int(avg_height))
+    copy_img = best_img.copy()
+    height, width = best_img.shape
+    min_height = 0
+    for peak_idx in range(len(peak_list)):
+        if peak_idx == 0:
+            min_height = peak_list[peak_idx][0]
+        else:
+            max_height = peak_list[peak_idx][0]
+            line_strips.append([min_height, max_height])
+            cv2.line(copy_img,(0, min_height),(width, min_height),(0, 200,0), 4)   
+            cv2.line(copy_img,(0, max_height),(width, max_height),(0, 200,0), 4) 
+            min_height = max_height
+
+#     plt.figure(figsize = (500,10))
+#     plt.imshow(copy_img, cmap='gray', aspect = 1)
+#     plt.show()    
+    
+    return best_img, line_strips, copy_img
+
 
 # given a dead sea scroll, recognize the words contained within
 def recognize_handwriting(image, path, plot):
@@ -391,4 +473,6 @@ def recognize_handwriting(image, path, plot):
             recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width,  all_prob, first_chars_prob, plot)
             recognized_words.append(recognized_word)
         write_line_to_file(recognized_words, path)
+        
+        
              
