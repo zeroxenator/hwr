@@ -5,6 +5,12 @@ from skimage.filters import threshold_sauvola
 
 from recognize_word_window import *
 from markov_chain_ngram import *
+from recognize_word_lstm import *
+
+from keras.models import Sequential, model_from_json
+from keras.layers import Dense, Dropout, Bidirectional, LSTM, CuDNNLSTM
+from keras.optimizers import RMSprop
+
 
 def extract_parchment(image, grey_thre):
     output_image = np.array(image, copy=True)  
@@ -171,7 +177,7 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
             trg_label = i
     # fuse the black background with the white parchment
     # parchment = 255 - parchment
-    parchment[labels == trg_label] = 255
+    parchment[labels == 0] = 255
     # _,parchment = cv2.threshold(parchment, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
 
@@ -370,7 +376,13 @@ def create_char_codes():
     }
     return codes
             
+def load_model():   
+    json_file = open('lstm/model.json', 'r') 
+    loaded_model_json = json_file.read()
     
+    model = model_from_json(loaded_model_json)
+    model.load_weights("lstm/stored_weights")
+    return model
 
 # given a dead sea scroll, recognize the words contained within
 def recognize_handwriting(image, path, plot):
@@ -381,14 +393,14 @@ def recognize_handwriting(image, path, plot):
     #print("Initial prob vector:", first_chars_prob)
     
     # extract the binarized parchment from the image
-    parchment = extract_parchment(image, 100)
+    parchment = extract_parchment(image, 60)
     # detect words and characters in the parchment
     boxes, centroids, avg_height, avg_width = segment_words(parchment.copy())
     print("Average word height and width:", avg_height, avg_width)
     # divide parchment into line strips containing words and characters
     strips, whitened_parchment, line_image = segment_line_strips(boxes, centroids, parchment, avg_height, avg_width)
     #for each line strip, split words into characters and recognize characters
-    k_size = int(avg_height / 10)
+    k_size = int(avg_height / 10) 
     kernel = np.ones((k_size,k_size),np.uint8)
     parchment_morphed = cv2.morphologyEx(whitened_parchment, cv2.MORPH_CLOSE, kernel)
     #parchment_morphed = cv2.morphologyEx(parchment_morphed, cv2.MORPH_OPEN, kernel)
@@ -401,6 +413,10 @@ def recognize_handwriting(image, path, plot):
         plt.imshow(parchment_morphed, cmap='gray', aspect = 1)
         plt.show()
     
+    
+    # load the lstm model
+    model = load_model()
+    print("LSTM model:", model.summary())
     for strip in strips:
         recognized_words = []
         """plt.figure(figsize = (500,4))
@@ -412,7 +428,10 @@ def recognize_handwriting(image, path, plot):
             print("Recognizing the following word:")
             # extract the characters in the word
             #characters = extract_characters(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
+            print("-----CNN:-------")
             recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width,  all_prob, first_chars_prob, plot)
-            recognized_words.append(recognized_word)
-        write_line_to_file(recognized_words, path, character_codes)
+            #recognized_words.append(recognized_word)
+            print("-----LSTM:-------")
+            recognize_word_lstm(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), model, avg_width, plot)
+        #write_line_to_file(recognized_words, path, character_codes)
              
