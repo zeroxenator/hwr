@@ -61,11 +61,7 @@ def compute_frequency(word_string, n_chars, names, frequencies):
 # connected components and recognizing characters within
 def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
     
-    # show the word
-    if(plot):
-        plt.figure(figsize = (500,4))
-        plt.imshow(word, cmap='gray', aspect = 1)
-        plt.show()
+ 
     
 
     # define how much the window moves each step
@@ -78,6 +74,15 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
     window_y = 0
     
     word = 255 - word
+    
+    # binarize the word, just in case
+    _,word = cv2.threshold(word,127,255,cv2.THRESH_BINARY)
+    
+    # show the word
+    if(plot):
+        plt.figure(figsize = (500,4))
+        plt.imshow(word, cmap='gray', aspect = 1)
+        plt.show()
    
 
     kernel = np.ones((3,3),np.uint8)
@@ -90,16 +95,20 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
     stats = stats[1:]
     
     stats = stats[stats[:,0].argsort()]
+ 
     components = [] 
     # plot all components
-    for stat in stats:
-        
+    for stat in stats:  
         if(stat[2] > (0.4 * avg_width) and stat[3] > (0.2 * avg_width) and stat[2] < (avg_width * 5) and stat[3] < (avg_width * 5)):
             print(stat[0])
             components.append(stat)
           
     candidates = [] 
     n_characters = 0
+    # store the characters, to pass them to the LSTM later
+    chars = []
+    # store the character confidences, to pass them to the LSTM later
+    confidences = []
     components = list(np.flip(np.array(components), 0))
     # for every component:
     for component in components:
@@ -107,10 +116,9 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
         # slide a window across and classify the content within
         component_image = word[component[1]: component[1]+ component[3], component[0]: component[0]+component[2]]
         word_width = component_image.shape[1]
-        # dilate the component
-        #component_image = cv2.dilate(component_image, kernel, iterations = 1)
+      
         # if the component is big enough, slide through it to detect multiple characters
-        if(component[2] > (avg_width * 1.2)):
+        if(component[2] > (avg_width * 1.1)):
             print("Component is big: use sliding window!")
             # add zero padding to the left and right of image
             padding = np.zeros((component_image.shape[0], int(component_image.shape[1]/6)))
@@ -142,6 +150,8 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
             possible_character = False
             
             window_chars = []
+            slided_chars = []
+            sliding_confidences = []
             while((window_x + window_width) <= component_image.shape[1]):
                 window = component_image[window_y:window_y + component_image.shape[0], window_x:window_x + window_width]
                 # skip complete empty windows
@@ -165,7 +175,11 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
                         
                         # store window-slided detected characters: these need to be stored in the reversed order later
                         window_chars.append(top_chars)
-                        #candidates.append(top_chars)
+                        
+                        sliding_confidences.append(max(top_scores))
+                        
+                        # store the character image
+                        slided_chars.append(window)
                         
                         print("Recognition result:", top_chars, top_scores)
                         print("---------------------------------------------------\n")
@@ -175,41 +189,7 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
                         # won't be only a few pixels next to current character
                         #window_x += int(avg_width) - stride
                         window_x += int(word_width / 2) - stride + 15
-                        
-                        
-                    """if((possible_character == True and N_candidates > previous_N) or top_scores[0] >= 0.7):
-                        
-                        
-                        # go back one stride, unless the window is at the first position
-                        if(window_x != 0):
-                            print("\nCharacter found at position", int((window_x - stride) / stride), ":")
-                            window = component_image[window_y:window_y + component_image.shape[0], window_x - stride :window_x -stride + window_width + 15]
-                            window = cv2.dilate(window ,kernel, iterations = 1)
-                        else:
-                            print("\nCharacter found at position", 0, ":")
-                        
-                        
-                        #show the window content
-                        if(plot):
-                            plt.figure(figsize = (500,4))
-                            plt.imshow(window, cmap='gray', aspect = 1)
-                            plt.show()
-                        
-                        top_chars, top_scores = recognize_character(window)
-                        
-                        # store window-slided detected characters: these need to be stored in the reversed order later
-                        window_chars.append(top_chars)
-                        #candidates.append(top_chars)
-                        
-                        print("Recognition result:", top_chars, top_scores)
-                        print("---------------------------------------------------\n")
-                        possible_character = False
-                        
-                        # skip a few frames ahead, because next character
-                        # won't be only a few pixels next to current character
-                        #window_x += int(avg_width) - stride
-                        window_x += int(word_width / 2) - stride + 15
-                        """
+                       
                         
                     
                     # if the amount of candidates is smaller, 
@@ -226,8 +206,21 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
                 window_x += stride
                 
             window_chars.reverse()
+            
+            sliding_confidences.reverse()
+            
+            # reverse position of characters found by the sliding window
+            slided_chars.reverse()
+            # add characters to character list
+            for ch in slided_chars:
+                chars.append(ch)
+            
             for character in window_chars:
                 candidates.append(character)
+                
+            for conf in sliding_confidences:
+                confidences.append(conf)
+            
         # else, sliding is not necessary as the component is probably just a character,
         # which can be recognized immediately
         else:
@@ -248,18 +241,28 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
             
            
             window = word[component[1]:component[1] + height, component[0]:component[0] + component[2]]
-            window = cv2.dilate(window ,kernel, iterations = 1)
+            # store the character image
+            chars.append(window)
+            #window = cv2.dilate(window ,kernel, iterations = 1)
             if(plot):
                 plt.imshow(window, cmap='gray', aspect = 1)
                 plt.show()
             top_chars, top_scores = recognize_character(window)
             candidates.append(top_chars)
+            confidences.append(max(top_scores))
+            
             print("Recognition result:", top_chars, top_scores)
             print("---------------------------------------------------\n")
         print()
-    print("Candidates:", candidates)
     
-    combinations = list(itertools.product(*candidates))
+    
+    new_candidates = []
+    for c in candidates:
+        new_candidates.append([c[0].split(" ")[0]])
+    
+    print("Candidates:", new_candidates)
+  
+    combinations = list(itertools.product(*new_candidates))
     print("Combinations:", combinations)
     
     # find the most frequent combination
@@ -274,6 +277,11 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
     combi_props = []
     
     
+    '''print("\nThese characters will be passed to the LSTM!\n")
+    for ch in chars:
+        plt.imshow(ch, cmap='gray', aspect = 1)
+        plt.show()'''
+        
     
     
     for combi in combinations:    
@@ -309,21 +317,17 @@ def recognize_word(word, avg_width, trans_matrix, start_vector, plot):
     best = "_".join(list(combinations[best_prob_index]))
     print("Best word:", best)
     
-    if(best in names):
-        index = names.index(best)  
-        print(list(ngrams['Hebrew_character'])[index])
-        return list(ngrams['Hebrew_character'])[index]
-        #return best
-    else:
-        # if word is not in ngrams, write all of its characters to file
-        best = best.split('_')
-        #if(len(best) > 1):
-            #best.reverse()
-        print("Best?!:", best)
-        return best
+    # get the sequence in the correct format
+    best = best.split('_')
+ 
+    sequence = []
+    for ch in best:
+        sequence.append(ch.split(" ")[0])
         
-  
-        
+    print("Final sequence:", sequence)
+    print("Confidences:", confidences)
+    
+    return chars, sequence, confidences
         
         
 

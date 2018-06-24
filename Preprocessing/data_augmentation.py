@@ -97,9 +97,9 @@ def image_aug(image):
     return images_aug
 
 
-def up_sample(target_number=1500):
-    base_path = 'upsampled_monkbrill_aug'
-    target_folder = 'upsampled_monkbrill_aug'
+def up_sample(target_number=500):
+    base_path = 'monkbrill_aug'
+    target_folder = 'monkbrill_aug'
     root_dir = os.getcwd()
     source_dir = os.path.join(root_dir, base_path)
     target_dir = os.path.join(root_dir, target_folder)

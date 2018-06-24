@@ -3,6 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_sauvola
 
+from scipy.ndimage import rotate
+from recognize_word_window import *
+from markov_chain_ngram import *
+
+
 from recognize_word_window import *
 from markov_chain_ngram import *
 from recognize_word_lstm import *
@@ -10,7 +15,6 @@ from recognize_word_lstm import *
 from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Dropout, Bidirectional, LSTM, CuDNNLSTM
 from keras.optimizers import RMSprop
-
 
 def extract_parchment(image, grey_thre):
     output_image = np.array(image, copy=True)  
@@ -177,49 +181,15 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
             trg_label = i
     # fuse the black background with the white parchment
     # parchment = 255 - parchment
-    parchment[labels == 0] = 255
+    parchment[labels == trg_label] = 255
     # _,parchment = cv2.threshold(parchment, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 
 
-    height, width = parchment.shape
+    height, width = parchment.shape    
+    parchment, na, na2 = rotation_procedure(parchment.copy(), avg_height)
     line_image = parchment.copy()
-    """word_lines = []
-    line = []
-    # add first box to first line
-    line.append(boxes.pop(0))
-    previous_centroid = box_centroids[0][1]
-    box_centroids.pop(0)
-    for i in range(len(boxes)):
-        box = boxes[i]
-        #check if box belongs to the same line as the previous one: check if centroid of box falls within the range of the previous
-        #box
-        centroid_y = box_centroids[i][1]
-        if(centroid_y >= (previous_centroid - avg_height) and (centroid_y <= previous_centroid + avg_height)):
-            line.append(box)
-            previous_centroid = centroid_y
-        else:
-            #if not, add the line to the collection of lines and start a new one
-            if(line != []):
-                word_lines.append(line)
-                line = []
-                previous_centroid = centroid_y
-                line.append(box)
-    #save strip images
-    strips = []
-    # draw lines for the first strip
-    for line in word_lines:
-        min_height = 99999
-        max_height = 0
-        for box in line:
-            if(box[1] < min_height):
-                min_height = box[1]
-            if(box[1] + box[3]  > max_height):
-                max_height = box[1] + box[3] 
-        #cv2.line(line_image,(0,min_height),(width, min_height),(0,200,0),3)   
-        #strips.append([min_height, max_height])
-        strips.append(parchment[min_height:max_height, :])
     
-    return strips"""
+    boxes, centroids, avg_height, avg_width = segment_words(parchment)
     
     box_threshold  = avg_height * 2
     line_count_threshold = 2
@@ -342,6 +312,87 @@ def extract_words(strip):
             plt.show()"""
     return words
 
+    
+def find_peak(hist, peak_window=5, grey_threshold=100):
+    peak_kernel = peak_window // 2
+    rg = range(len(hist))
+    list_peaks = []
+    for i in rg:
+        max_count = 0
+        for j in range(i, i + peak_window):
+            if max_count < hist[i]:
+                max_count = hist[i]
+
+        # find if the max is peak
+        peak_flag = True
+        for k in range(peak_kernel):
+            idx_diff = k + 1
+            idx_min = 0 if (i - idx_diff) < 0 else i - idx_diff
+            idx_max = (len(hist)-1) if (i + idx_diff) > (len(hist)-1) else i + idx_diff
+            if max_count <= hist[idx_min] or max_count <= hist[idx_max]:
+                peak_flag = False
+        if peak_flag:
+            list_peaks.append([i, max_count])
+#     list_peaks.sort(key=lambda x: x[1], reverse=True)
+    
+    return list_peaks
+
+def rotate_img(img, degree=10, interval=1):
+    degree_start = abs(degree)
+    degree_end = -(degree_start + 1)
+    interval = int(interval)
+    if interval < 1:
+        raise ValueError(
+                "parameter interval should be at least 1, now it's {}".format(interval))
+    
+    images_to_return = []
+    for i in range(degree_start, degree_end, -interval):
+        processed = img.copy()    
+        processed = rotate(processed, i, reshape=True, cval=255)
+        images_to_return.append(processed)
+    return images_to_return
+            
+def rotation_procedure(image, avg_height):
+    rotated_img_list = rotate_img(image, 10, 1)
+    best_img = image.copy()
+    line_strips = []
+    max_range = 0    
+    for rotated_img in rotated_img_list:
+        
+      # verticalProfile = np.sum(whitened_parchment, axis=0)
+        horizontalProfile = np.sum(rotated_img, axis=1)        
+        temp_max_range = horizontalProfile.max() - horizontalProfile.min()
+        
+        if temp_max_range > max_range:
+            max_range = temp_max_range
+            best_img = rotated_img
+            best_horizontalProfile = horizontalProfile
+            # plt.plot(range(0,columns), verticalProfile)
+
+#     [rows, columns] = best_img.shape
+#     plt.plot(best_horizontalProfile, range(0,rows))
+#     plt.show()
+    # adjust window size
+    peak_list = find_peak(best_horizontalProfile, int(avg_height))
+    copy_img = best_img.copy()
+    height, width = best_img.shape
+    min_height = 0
+    for peak_idx in range(len(peak_list)):
+        if peak_idx == 0:
+            min_height = peak_list[peak_idx][0]
+        else:
+            max_height = peak_list[peak_idx][0]
+            line_strips.append([min_height, max_height])
+            cv2.line(copy_img,(0, min_height),(width, min_height),(0, 200,0), 4)   
+            cv2.line(copy_img,(0, max_height),(width, max_height),(0, 200,0), 4) 
+            min_height = max_height
+
+#     plt.figure(figsize = (500,10))
+#     plt.imshow(copy_img, cmap='gray', aspect = 1)
+#     plt.show()    
+    
+    return best_img, line_strips, copy_img
+
        
 def write_line_to_file(words, path, codes):
     name = path.split('/')[1].split('.')[0]
@@ -429,9 +480,10 @@ def recognize_handwriting(image, path, plot):
             # extract the characters in the word
             #characters = extract_characters(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
             print("-----CNN:-------")
-            recognized_word = recognize_word(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width,  all_prob, first_chars_prob, plot)
-            #recognized_words.append(recognized_word)
+            chars, sequence, confidences = recognize_word(word, avg_width,  all_prob, first_chars_prob, plot)
+            
             print("-----LSTM:-------")
-            recognize_word_lstm(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), model, avg_width, plot)
-        #write_line_to_file(recognized_words, path, character_codes)
+            final_sequence = recognize_word_lstm(word, chars, sequence, confidences, model, avg_width, plot)
+            recognized_words.append(final_sequence)
+        write_line_to_file(recognized_words, path, character_codes)
              
