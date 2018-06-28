@@ -43,10 +43,31 @@ def get_predictions(model, image, n_chars):
     return final_output, output_trimmed.tolist()
     
     
-
+# apply domain knowledge: medial characters have to be in the middle of the word,
+# final characters have to be the final character in the word
+# If any of them are in the wrong spot, the confidence in those predictions should
+# be set to zero
+def filter_with_knowledge(labels, confidences): 
+    # first check if label can be split in two
+    if(len(labels[0].split('-')) > 1):
+        # check if first character in the sequence has 'final' or 'medial' in the name, which is not allowed
+        if(labels[0].split('-')[1] == "final" or labels[0].split('-')[1] == 'medial'):
+            confidences[0] = 0
+    if(len(labels[-1].split('-')) > 1):
+        # check if final character in predicted sequence has medial in the name, which is also not allowed
+        if(labels[-1].split('-')[1] == "medial"):
+            confidences[-1] = 0
+    
+    return labels, confidences
+    
 
     
 def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_confidences):
+    
+    # filter the confidences of the labels by using domain knowledge  (final and medial characters)
+    char_preds, char_probs = filter_with_knowledge(char_preds, char_probs)
+    cnn_sequence, cnn_confidences = filter_with_knowledge(cnn_sequence, cnn_confidences)
+    
     
    
     
@@ -63,16 +84,17 @@ def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_c
         "het": ["he, taw"],
         "taw": ["he", "het"],
         
-        "dalet": ["resh", "waw", "yod", "kaf-final", "nun-final", "pe-final"],
-        "resh": ["dalet", "waw", "yod", "kaf-final", "nun-final", "pe-final"],
-        "waw": ["resh", "dalet", "yod", "kaf-final", "nun-final", "pe-final"],
-        "yod": ["resh", "waw", "dalet", "kaf-final", "nun-final", "pe-final"],
-        "kaf-final": ["resh", "waw", "yod", "dalet", "nun-final", "pe-final"],
-        "nun-final": ["resh", "waw", "yod", "kaf-final", "dalet", "pe-final"],
-        "pe-final": ["resh", "waw", "yod", "kaf-final", "nun-final", "dalet"],
+        "dalet": ["resh", "kaf-final", "nun-final", "pe-final"],
+        "resh": ["dalet", "kaf-final", "nun-final", "pe-final"],
+        "kaf-final": ["resh", "dalet", "nun-final", "pe-final"],
+        "nun-final": ["resh", "kaf-final", "dalet", "pe-final"],
+        "pe-final": ["resh", "kaf-final", "nun-final", "dalet"],
         
-        "tsadi-medial" : ["tsadi-final"],
-        "tsadi-final" : ["tsadi-medial"]
+        #"tsadi-medial" : ["tsadi-final"],
+        #"tsadi-final" : ["tsadi-medial"],
+        
+        "waw": ["yod"],
+        "yod": ["waw"]
         
     }
    
@@ -101,7 +123,7 @@ def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_c
             char_pred = char_preds[j]
             if(word_pred == char_pred):
                 final_output[j] = char_preds[j]
-                #matching_chars.append(j)
+                
                 
         # 2: is a similar character from the word prediction in character predictions?
         if(word_pred in similar_characters.keys()):
@@ -134,8 +156,35 @@ def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_c
     for p in positions:
         # position in sequence still empty?
         if(p not in final_output.keys()):
-            # fill the position with the CNN prediction
-            final_output[p] = cnn_sequence[p]
+            # fill the position with the CNN prediction or word prediction, depending on which is higher, unless character is not allowed there (conf == 0).
+            print("Empty position:", p)
+            print("LSTM: ",  char_preds[p] , char_probs[p])
+            print("CNN: ",  cnn_sequence[p] , cnn_confidences[p])
+            if(cnn_confidences[p] != 0 or char_probs[p] != 0):
+                if(char_probs[p] > cnn_confidences[p]):
+                    final_output[p] = char_preds[p]
+                else:
+                    final_output[p] = cnn_sequence[p]
+            # else, look at the LSTM word prediction and take the character not yet in the sequence with the highest
+            # confidence
+            else:
+                # store characters that are not in the sequence yet
+                characters_left = []
+                probs = []
+                for i in range(len(word_preds)):
+                    if(word_preds[i] not in list(final_output.values())):
+                        characters_left.append(i)
+                        probs.append(word_probs[i])
+                # get the character with the highest LSTM word classification confidence
+                best = max(probs)
+                best_idx = probs.index(best)
+                final_output[p] = word_preds[best_idx]
+                
+                        
+                    
+                        
+                
+                
         
     # use the dictionary to build the sequence
     for pos in final_output.keys():
@@ -155,58 +204,60 @@ def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_c
 # recognize the word using the trained LSTM model 
 def recognize_word_lstm(word, chars, cnn_sequence, cnn_confidences, model, avg_width, plot):
 
-    
-    
-    kernel = np.ones((3,3))
-    
-    # invert the colors
-    word = 255 - word
-    print("orig shape:",word.shape)
-    
-    _,word = cv2.threshold(word,127,255,cv2.THRESH_BINARY)
-    
-    #word = cv2.dilate(word, kernel, iterations = 1)
-    #word = cv2.erode(word, kernel, iterations = 1)
-    
-    
-    # show the word
-    if(plot):
-        """im = cv2.imread('4.jpg', 0)
-        
-        plt.figure(figsize = (500,4))
-        plt.imshow(im, cmap='gray', aspect = 1)
-        plt.show()"""
-        
-        plt.figure(figsize = (500,4))
-        plt.imshow(word, cmap='gray', aspect = 1)
-        plt.show()
-    
     n_chars = len(chars)
     
     print("N chars:", n_chars)
-  
-    word = cv2.resize(word, (32, 32))
-    word = word / 255
-    word = np.reshape(word, (1,32,32))
     
-    word_preds, word_probs = get_predictions(model, word, n_chars)
-    word_probs = word_probs[0]
+    if(n_chars > 0):
     
-    char_preds = []
-    char_probs = []
-    for ch in chars:
-        plt.imshow(ch, cmap='gray', aspect = 1)
-        plt.show()
-        ch = cv2.resize(ch, (32, 32))
-        ch = ch / 255
-        ch = np.reshape(ch, (1,32,32))
-        preds, probs = get_predictions(model, ch, 1)
-        char_preds.append(preds[0])
-        char_probs.append(probs[0][0])
-      
-        
-    # combine the word and character perspectives to output a final classification
-    return classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_confidences)
+        kernel = np.ones((3,3))
+
+        # invert the colors
+        word = 255 - word
+        print("orig shape:",word.shape)
+
+        _,word = cv2.threshold(word,127,255,cv2.THRESH_BINARY)
+
+        #word = cv2.dilate(word, kernel, iterations = 1)
+        #word = cv2.erode(word, kernel, iterations = 1)
+
+
+        # show the word
+        if(plot):
+            """im = cv2.imread('4.jpg', 0)
+
+            plt.figure(figsize = (500,4))
+            plt.imshow(im, cmap='gray', aspect = 1)
+            plt.show()"""
+
+            plt.figure(figsize = (500,4))
+            plt.imshow(word, cmap='gray', aspect = 1)
+            plt.show()
+
+
+        word = cv2.resize(word, (32, 32))
+        word = word / 255
+        word = np.reshape(word, (1,32,32))
+
+        word_preds, word_probs = get_predictions(model, word, n_chars)
+        word_probs = word_probs[0]
+
+        char_preds = []
+        char_probs = []
+        for ch in chars:
+            plt.imshow(ch, cmap='gray', aspect = 1)
+            plt.show()
+            ch = cv2.resize(ch, (32, 32))
+            ch = ch / 255
+            ch = np.reshape(ch, (1,32,32))
+            preds, probs = get_predictions(model, ch, 1)
+            char_preds.append(preds[0])
+            char_probs.append(probs[0][0])
+
+
+        # combine the word and character perspectives to output a final classification
+        return classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_confidences)
+    return ""
         
         
     

@@ -484,6 +484,8 @@ def recognize_handwriting(image, path, plot):
             
             print("-----LSTM:-------")
             final_sequence = recognize_word_lstm(word, chars, sequence, confidences, model, avg_width, plot)
-            recognized_words.append(final_sequence)
+            # if no characters are found, then don't add anything
+            if(final_sequence != ""):
+                recognized_words.append(final_sequence)
         write_line_to_file(recognized_words, path, character_codes)
              
