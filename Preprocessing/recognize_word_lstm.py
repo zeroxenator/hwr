@@ -48,10 +48,18 @@ def get_predictions(model, image, n_chars):
 # If any of them are in the wrong spot, the confidence in those predictions should
 # be set to zero
 def filter_with_knowledge(labels, confidences): 
+    
+    # check if a -final character is anywhere but in the final position
+    for i in range(len(labels) - 1):
+        if(len(labels[i].split('-')) > 1 and labels[i].split('-')[1] == "final"):
+            confidences[i] = 0
+        
+    
+    
     # first check if label can be split in two
     if(len(labels[0].split('-')) > 1):
         # check if first character in the sequence has 'final' or 'medial' in the name, which is not allowed
-        if(labels[0].split('-')[1] == "final" or labels[0].split('-')[1] == 'medial'):
+        if(labels[0].split('-')[1] == 'medial'):
             confidences[0] = 0
     if(len(labels[-1].split('-')) > 1):
         # check if final character in predicted sequence has medial in the name, which is also not allowed
@@ -60,7 +68,15 @@ def filter_with_knowledge(labels, confidences):
     
     return labels, confidences
     
-
+def illegal_character(labels, index):
+    if(len(labels[index].split('-')) > 1):
+        if(labels[index].split('-')[1] == "final" and index < (len(labels) -1)):
+            return True
+        elif(labels[index].split('-')[1] == "medial" and (index == 0 or (len(labels) -1))):
+            return True
+    return False
+            
+    
     
 def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_confidences):
     
@@ -122,7 +138,8 @@ def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_c
         for j in range(len(char_preds)):
             char_pred = char_preds[j]
             if(word_pred == char_pred):
-                final_output[j] = char_preds[j]
+                if(char_probs[i] >= 0.5):
+                    final_output[j] = char_preds[j]
                 
                 
         # 2: is a similar character from the word prediction in character predictions?
@@ -168,11 +185,11 @@ def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_c
             # else, look at the LSTM word prediction and take the character not yet in the sequence with the highest
             # confidence
             else:
-                # store characters that are not in the sequence yet
+                # store characters that are not in the sequence yet and are not illegal (final / medial)
                 characters_left = []
                 probs = []
                 for i in range(len(word_preds)):
-                    if(word_preds[i] not in list(final_output.values())):
+                    if(word_preds[i] not in list(final_output.values()) and not (illegal_character(word_preds, i))):
                         characters_left.append(i)
                         probs.append(word_probs[i])
                 # get the character with the highest LSTM word classification confidence
