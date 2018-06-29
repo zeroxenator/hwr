@@ -480,8 +480,7 @@ def recognize_handwriting(image, path, plot):
             # extract the characters in the word
             #characters = extract_characters(cv2.morphologyEx(word, cv2.MORPH_CLOSE, kernel), avg_width)
             print("-----CNN:-------")
-            chars, sequence, confidences = recognize_word(word, avg_width,  all_prob, first_chars_prob, plot)
-            
+            chars, sequence, confidences = recognize_word(word, avg_width,  all_prob, first_chars_prob, plot)        
             print("-----LSTM:-------")
             final_sequence = recognize_word_lstm(word, chars, sequence, confidences, model, avg_width, plot)
             # if no characters are found, then don't add anything

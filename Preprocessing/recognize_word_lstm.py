@@ -138,8 +138,9 @@ def classify(word_preds, word_probs, char_preds, char_probs, cnn_sequence, cnn_c
         for j in range(len(char_preds)):
             char_pred = char_preds[j]
             if(word_pred == char_pred):
-                if(char_probs[i] >= 0.5):
+                if(char_probs[j] >= 0.5):
                     final_output[j] = char_preds[j]
+                
                 
                 
         # 2: is a similar character from the word prediction in character predictions?
