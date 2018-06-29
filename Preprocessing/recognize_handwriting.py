@@ -176,9 +176,12 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
     n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img_to_find_background, 8, cv2.CV_32S)
 
     trg_label = 0
-    for i in range(len(stats)):
-        if stats[i][0] == 0 and stats[i][1] == 0:
-            trg_label = i
+    # Below loop doesnt work for test image 20, finding trg as 1
+#     for i in range(len(stats)):
+#         if stats[i][0] == 0 and stats[i][1] == 0:
+#             trg_label = i
+    # End Comment
+    
     # fuse the black background with the white parchment
     # parchment = 255 - parchment
     parchment[labels == trg_label] = 255
@@ -223,7 +226,7 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
                 line.append(1)
                 word_lines.append(line)
 
-    for line in word_lines:
+    for line in word_lines[0:-1]:
         if line[1] < line_count_threshold:
             line[0] = -100
         print(line)
