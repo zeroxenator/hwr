@@ -289,7 +289,10 @@ def segment_line_strips(boxes, box_centroids, parchment, avg_height, avg_width):
 def extract_words(strip):
     kernel = np.ones((5,5),np.uint8)
     strip_morphed = 255 - strip
-    strip_morphed = cv2.dilate(strip_morphed,kernel,iterations = 2)
+    
+    strip_morphed = cv2.erode(strip_morphed, kernel, iterations = 1)
+    strip_morphed = cv2.dilate(strip_morphed, kernel, iterations = 4)
+    
     #strip = cv2.GaussianBlur(strip, (15,15), 10)
     #strip = cv2.GaussianBlur(strip, (35,35), 10)
     _, strip_morphed = cv2.threshold(strip_morphed, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
@@ -304,8 +307,14 @@ def extract_words(strip):
     # get all components (words), except the first one (background) 
     # (x, y, width, height)
     for stat in stats:
-        if(stat[4] > 1000 and stat[2] < 200):
-            word = strip[stat[1]:stat[1] + stat[3], stat[0]:stat[0] + stat[2]]
+        x = stat[0]
+        y = stat[1]
+        width = stat[2]
+        height = stat[3]
+        area = stat[4]
+        
+        if(area > 1000 and width < 300):
+            word = strip[y:y + height, x:x + width]
             words.append(word)
             """plt.figure(figsize = (500,4))
             plt.imshow(strip[stat[1]:stat[1] + stat[3], stat[0]:stat[0] + stat[2]], cmap='gray', aspect = 1)
